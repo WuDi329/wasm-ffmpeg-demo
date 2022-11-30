@@ -11,9 +11,22 @@
       const ffmpeg = createFFmpeg({ log: true });
       const transcode = async ({ target: { files } }) => {
         const { name } = files[0];
+
+        //Load ffmpeg.wasm-core script.
+        //In browser environment, the ffmpeg.wasm-core script is fetch from CDN and can be assign to a local path by assigning corePath. 
+        //In node environment, we use dynamic require and the default corePath is $ffmpeg/core.
+        //Typically the load() func might take few seconds to minutes to complete, better to do it as early as possible.
         await ffmpeg.load();
+
+        //Run FS operations.
+
+        //For input/output file of ffmpeg.wasm, it is required to save them to MEMFS first so that ffmpeg.wasm is able to consume them. 
+        //Here we rely on the FS methods provided by Emscripten.
+        //https://emscripten.org/docs/api_reference/Filesystem-API.html
         ffmpeg.FS('writeFile', name, await fetchFile(files[0]));
+        //This is the major function in ffmpeg.wasm, you can just imagine it as ffmpeg native cli and what you need to pass is the same.
         await ffmpeg.run('-i', name,  'output.mp4');
+        ///* Read data from MEMFS */
         const data = ffmpeg.FS('readFile', 'output.mp4');
         const video = document.getElementById('player');
         video.src = URL.createObjectURL(new Blob([data.buffer], { type: 'video/mp4' }));
